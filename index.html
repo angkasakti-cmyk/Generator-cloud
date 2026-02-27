@@ -2,129 +2,189 @@
 <html>
 <head>
 <meta charset="UTF-8">
+<title>Catatan Wilayah Offline</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Generator ELITE PRO MAX</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
 <style>
-body { font-family: Arial; padding:20px; background:#f4f6f9; }
-.container { background:white; padding:20px; border-radius:12px; max-width:1000px; margin:auto; box-shadow:0 5px 20px rgba(0,0,0,0.1); }
-
-#startVals { width:100%; height:60px; margin-top:10px; font-family:monospace; font-size:16px; }
-#output { width:100%; height:300px; margin-top:10px; font-family:monospace; }
-
-input { padding:8px; width:100%; margin-bottom:10px; }
-
-button { padding:10px 18px; margin:5px 5px 5px 0; border:none; border-radius:8px; cursor:pointer; font-size:15px;}
-.gen { background:#4CAF50; color:white; }
-.copy { background:#2196F3; color:white; }
-.xlsx { background:#FF9800; color:white; }
-.csv { background:#795548; color:white; }
-
-.stat { margin-top:10px; font-size:14px; font-weight:bold; }
+body{
+    font-family: Arial;
+    background:#f4f6f9;
+    padding:15px;
+}
+.card{
+    background:white;
+    padding:15px;
+    border-radius:10px;
+    margin-bottom:15px;
+    box-shadow:0 2px 5px rgba(0,0,0,0.1);
+}
+button{
+    padding:8px 12px;
+    border:none;
+    border-radius:6px;
+    margin:3px 0;
+    background:#2d89ef;
+    color:white;
+    cursor:pointer;
+}
+button.red{background:#e81123;}
+input, select, textarea{
+    width:100%;
+    padding:8px;
+    margin:5px 0;
+}
+.list-item{
+    background:#eef2f7;
+    padding:8px;
+    border-radius:6px;
+    margin:5px 0;
+    cursor:pointer;
+}
 </style>
 </head>
 <body>
 
-<div class="container">
-<h2>🔥 Generator Angka ELITE PRO MAX</h2>
+<h2>Catatan Wilayah Offline</h2>
 
-<label>Masukkan Kode Awal (pisahkan enter):</label>
-<textarea id="startVals" placeholder="Masukkan kode di sini..."></textarea>
+<div class="card">
+<select id="wilayah"></select>
+<select id="sub"></select>
 
-<label>Jumlah Data per Kode:</label>
-<input type="number" id="jumlah" value="100">
+<textarea id="catatan" placeholder="Tulis catatan..."></textarea>
 
-<button class="gen" onclick="generate()">Generate</button>
-<button class="copy" onclick="copyAll()">Copy</button>
-<button class="xlsx" onclick="downloadXLSX()">Download XLSX</button>
-<button class="csv" onclick="downloadCSV()">Download CSV</button>
+<button onclick="simpan()">Simpan</button>
+<button onclick="edit()">Edit</button>
+<button onclick="hapus()" class="red">Hapus</button>
+<button onclick="copyText()">Copy Sekali Klik</button>
+</div>
 
-<div class="stat" id="stat"></div>
-<textarea id="output" readonly></textarea>
+<div class="card">
+<h4>Tambah Wilayah</h4>
+<input id="wilayahBaru" placeholder="Nama Wilayah">
+<button onclick="tambahWilayah()">Tambah Wilayah</button>
+
+<h4>Tambah Sub Wilayah</h4>
+<input id="subBaru" placeholder="Nama Sub Wilayah">
+<button onclick="tambahSub()">Tambah Sub</button>
+</div>
+
+<div class="card">
+<h4>Daftar Catatan</h4>
+<div id="list"></div>
 </div>
 
 <script>
+let selectedIndex = null;
 
-let generatedData = [];
-
-function splitCode(code){
-    let match = code.match(/^(.*?)(\d+)$/);
-    if(!match) return null;
-    return { prefix: match[1], number: match[2] };
-}
-
-function pad(num,len){
-    return num.toString().padStart(len,'0');
-}
-
-function nextValue(current){
-    let last2 = current % 100;
-    let last3 = current % 1000;
-    let ribuan = Math.floor((current % 10000) / 1000);
-    let lastDigit = current % 10;
-
-    if (last3 >= 990 && last3 <= 993) return current + ((ribuan===4)?15:16);
-    if (last3 >= 994 && last3 <= 999) return current + ((ribuan===4)?5:6);
-    if (last2 >= 40 && last2 <= 42) return current + 17;
-    if (last2 >= 43 && last2 <= 49) return current + 7;
-    if (lastDigit === 0 || lastDigit === 1) return current + 18;
-    return current + 8;
-}
-
-function generate(){
-    let inputs = document.getElementById("startVals").value.trim().split("\n");
-    let jumlah = Number(document.getElementById("jumlah").value);
-
-    generatedData = [];
-    let outputText = "";
-
-    for(let code of inputs){
-        let parts = splitCode(code.trim());
-        if(!parts) continue;
-
-        let prefix = parts.prefix;
-        let numStr = parts.number;
-        let len = numStr.length;
-        let current = parseInt(numStr);
-
-        for(let i=1;i<=jumlah;i++){
-            if(i>1) current = nextValue(current);
-            let full = prefix + pad(current,len);
-            generatedData.push([full]);
-            outputText += full + "\r\n";
-        }
+function init(){
+    if(!localStorage.getItem("wilayah_list")){
+        localStorage.setItem("wilayah_list", JSON.stringify(["Jakarta","Bandung"]));
     }
-
-    document.getElementById("output").value = outputText;
-    document.getElementById("stat").innerHTML =
-        "Total Generated: " + generatedData.length.toLocaleString();
+    loadWilayah();
 }
 
-function copyAll(){
-    let textarea = document.getElementById("output");
-    textarea.select();
-    textarea.setSelectionRange(0, 999999);
-    document.execCommand("copy");
-    alert("Semua hasil berhasil dicopy!");
+function loadWilayah(){
+    let wilayahList = JSON.parse(localStorage.getItem("wilayah_list"));
+    let select = document.getElementById("wilayah");
+    select.innerHTML="";
+    wilayahList.forEach(w=>{
+        select.innerHTML += `<option>${w}</option>`;
+    });
+    loadSub();
 }
 
-function downloadXLSX(){
-    let wb = XLSX.utils.book_new();
-    let ws = XLSX.utils.aoa_to_sheet(generatedData);
-    XLSX.utils.book_append_sheet(wb, ws, "Data");
-    XLSX.writeFile(wb, "Data.xlsx");
+function loadSub(){
+    let w = document.getElementById("wilayah").value;
+    let key = "sub_"+w;
+    let sub = JSON.parse(localStorage.getItem(key)) || [];
+    let select = document.getElementById("sub");
+    select.innerHTML="";
+    sub.forEach(s=>{
+        select.innerHTML += `<option>${s}</option>`;
+    });
+    loadCatatan();
 }
 
-function downloadCSV(){
-    let csv = generatedData.map(r=>r[0]).join("\r\n");
-    let blob = new Blob([csv],{type:"text/csv"});
-    let link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "Data.csv";
-    link.click();
+function getKey(){
+    let w = document.getElementById("wilayah").value;
+    let s = document.getElementById("sub").value;
+    return "cat_"+w+"-"+s;
 }
 
+function loadCatatan(){
+    let list = JSON.parse(localStorage.getItem(getKey())) || [];
+    let div = document.getElementById("list");
+    div.innerHTML="";
+    list.forEach((item,i)=>{
+        div.innerHTML += `<div class="list-item" onclick="pilih(${i})">${item}</div>`;
+    });
+}
+
+function simpan(){
+    let list = JSON.parse(localStorage.getItem(getKey())) || [];
+    let text = document.getElementById("catatan").value;
+    if(text==="") return;
+    list.push(text);
+    localStorage.setItem(getKey(), JSON.stringify(list));
+    document.getElementById("catatan").value="";
+    loadCatatan();
+}
+
+function pilih(i){
+    let list = JSON.parse(localStorage.getItem(getKey()));
+    selectedIndex=i;
+    document.getElementById("catatan").value=list[i];
+}
+
+function edit(){
+    if(selectedIndex===null) return;
+    let list = JSON.parse(localStorage.getItem(getKey()));
+    list[selectedIndex]=document.getElementById("catatan").value;
+    localStorage.setItem(getKey(), JSON.stringify(list));
+    loadCatatan();
+}
+
+function hapus(){
+    if(selectedIndex===null) return;
+    let list = JSON.parse(localStorage.getItem(getKey()));
+    list.splice(selectedIndex,1);
+    localStorage.setItem(getKey(), JSON.stringify(list));
+    selectedIndex=null;
+    document.getElementById("catatan").value="";
+    loadCatatan();
+}
+
+function copyText(){
+    let text = document.getElementById("catatan").value;
+    navigator.clipboard.writeText(text);
+    alert("Tersalin!");
+}
+
+function tambahWilayah(){
+    let wilayahList = JSON.parse(localStorage.getItem("wilayah_list"));
+    let baru = document.getElementById("wilayahBaru").value;
+    if(baru==="") return;
+    wilayahList.push(baru);
+    localStorage.setItem("wilayah_list", JSON.stringify(wilayahList));
+    document.getElementById("wilayahBaru").value="";
+    loadWilayah();
+}
+
+function tambahSub(){
+    let w = document.getElementById("wilayah").value;
+    let key = "sub_"+w;
+    let sub = JSON.parse(localStorage.getItem(key)) || [];
+    let baru = document.getElementById("subBaru").value;
+    if(baru==="") return;
+    sub.push(baru);
+    localStorage.setItem(key, JSON.stringify(sub));
+    document.getElementById("subBaru").value="";
+    loadSub();
+}
+
+document.getElementById("wilayah").onchange=loadSub;
+document.getElementById("sub").onchange=loadCatatan;
+
+init();
 </script>
 
 </body>
